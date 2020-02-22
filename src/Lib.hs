@@ -97,10 +97,18 @@ pass1 (bs, libs, d, opening, opened) = (newBs, libs, d, opening, newOpened)
 appendBookToLibrary bid (Just(LibraryOpened id blst max clst n)) = Just (LibraryOpened id blst max (clst ++ [bid]) n)
 appendBookToLibrary bid Nothing                                  = Nothing
 
+-- tryFindLibrary [] opened            = Nothing
+-- tryFindLibrary (lid:blid) opened    = case (M.lookup lid opened) of
+    -- Just (LibraryOpened a b c d e) -> Just(LibraryOpened a b c d e)
+    -- Nothing                        -> tryFindLibrary blid opened
+
 tryFindLibrary [] opened            = Nothing
-tryFindLibrary (lid:blid) opened    = case (M.lookup lid opened) of
-    Just (LibraryOpened a b c d e) -> Just(LibraryOpened a b c d e)
-    Nothing                        -> tryFindLibrary blid opened
+tryFindLibrary (lid:blid) opened    = res
+                                      where blibset = S.fromList (lid:blid)
+                                            feels (LibraryOpened _ _ _ a _) (LibraryOpened _ _ _ b _) = compare (length a) (length b)
+                                            res = case (  L.sortBy feels $ filter (\(LibraryOpened lid _ _ _ _) -> S.member lid blibset) $ M.elems opened ) of
+                                                            []                             -> Nothing
+                                                            (LibraryOpened a b c d e : _)  -> Just(LibraryOpened a b c d e)
 
 tryStuffingBooks [] opened filled                         = ([], M.empty, (M.union opened filled))
 tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened) of
@@ -110,8 +118,8 @@ tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened)
                 where (rbs, ro, rf) = tryStuffingBooks bs opened filled
             Just (LibraryOpened lid blst max clst n) -> x
                 where x
-                       | (length clst) == max = tryStuffingBooks ((Book bid score blid):bs) (M.delete lid opened) (M.insert lid (LibraryOpened lid blst max clst n) filled)
-                       | (length clst) <  max = tryStuffingBooks bs (M.alter (appendBookToLibrary bid) lid opened) filled
+                       | (length clst) == max - 1 = tryStuffingBooks bs (M.delete lid opened) (M.insert lid (LibraryOpened lid blst max (bid:clst) n) filled)
+                       | (length clst) <  max - 1 = tryStuffingBooks bs (M.alter (appendBookToLibrary bid) lid opened) filled
 
 -- try to open a new library if possible
 pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
@@ -120,7 +128,7 @@ pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = res
     where blibset = S.fromList (bl:blid)
-          res = case ( reverse $ L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
+          res = case (  L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
                 []     -> Nothing
                 (x:xs) -> Just x
 
