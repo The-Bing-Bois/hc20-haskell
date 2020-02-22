@@ -120,7 +120,7 @@ pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = res
     where blibset = S.fromList (bl:blid)
-          res = case ( L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
+          res = case ( reverse $ L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
                 []     -> Nothing
                 (x:xs) -> Just x
 
@@ -132,8 +132,8 @@ tryOpenBestLibrary ((Book bid score (blid:blist)):bs) lbs Nothing s = case (tryG
     Nothing -> tryOpenBestLibrary bs lbs Nothing s 
     Just (Library lid t m n) -> (Just (Library lid t m (M.size s)), (M.delete lid lbs), s)
 tryOpenBestLibrary bs lbs (Just (Library lid t m n)) s
-    | t > 1 = (Just (Library lid (t-1) m n), lbs, s)
-    | otherwise = (x, y, M.insert lid (LibraryOpened lid [] m [] n) (M.union z s))
+    | t > 0 = (Just (Library lid (t-1) m n), lbs, s)
+    | otherwise = (x, y, M.insert lid (LibraryOpened lid [] m [] n) z)
                   where (x, y, z) = tryOpenBestLibrary bs (M.delete lid lbs) Nothing s
 
 
