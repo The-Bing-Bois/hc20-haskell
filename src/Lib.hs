@@ -106,7 +106,7 @@ tryFindLibrary [] opened            = Nothing
 tryFindLibrary (lid:blid) opened    = res
                                       where blibset = S.fromList (lid:blid)
                                             feels (LibraryOpened _ _ _ a _) (LibraryOpened _ _ _ b _) = compare (length a) (length b)
-                                            res = case (  L.sortBy feels $ filter (\(LibraryOpened lid _ _ _ _) -> S.member lid blibset) $ M.elems opened ) of
+                                            res = case ( L.sortBy feels $ filter (\(LibraryOpened lid _ _ _ _) -> S.member lid blibset) $ M.elems opened ) of
                                                             []                             -> Nothing
                                                             (LibraryOpened a b c d e : _)  -> Just(LibraryOpened a b c d e)
 
@@ -128,7 +128,7 @@ pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = res
     where blibset = S.fromList (bl:blid)
-          res = case (  L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
+          res = case (  reverse $ L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
                 []     -> Nothing
                 (x:xs) -> Just x
 
