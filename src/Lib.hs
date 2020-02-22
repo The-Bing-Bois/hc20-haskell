@@ -6,6 +6,7 @@ module Lib
 --- IMPORTS ------------------------------------------------------
 import qualified Data.IntMap.Strict as M
 import qualified Data.List as L
+import qualified Data.Set as S
 
 --- TYPES & DATA -------------------------------------------------
 
@@ -46,7 +47,7 @@ readData input = (newBm, newLib, (read d))
 -- takes an array of LibraryOpened and create an output
 writeAnswer :: [LibraryOpened] -> String
 writeAnswer lst = (show $ length lst) ++ "\n" ++ (writeLibrary sortedList "")
-    where sortedList = reverse . L.sort $ lst
+    where sortedList = reverse $ L.sortBy (\(LibraryOpened _ a _ _ _) (LibraryOpened _ b _ _ _) -> compare (length a) (length b)) $ lst
           writeLibrary [] out = out
           writeLibrary ((LibraryOpened id bs _ _ _):lbs) out =
                 writeLibrary lbs (out ++ (show id) ++ " "
@@ -116,17 +117,12 @@ tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened)
 pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
     where (newOpening, newLibs, newOpened) = tryOpenBestLibrary bs libs opening opened
 
--- tryGetBestLibrary []          _ = Nothing
--- tryGetBestLibrary (bl:blid) lbs = 
-   -- case ( L.sort $ filter (\(Library lid _ _ _) -> any (\(xid) -> lid == xid) (bl:blid)) $ M.elems lbs ) of
-        -- []     -> Nothing
-        -- (x:xs) -> Just x
-
 tryGetBestLibrary []          _ = Nothing
-tryGetBestLibrary (bl:blid) lbs = 
-   case ( L.sort $ filter (\(Library lid _ _ _) -> any (\(xid) -> lid == xid) (bl:blid)) $ M.elems lbs ) of
-        []     -> Nothing
-        (x:xs) -> Just x
+tryGetBestLibrary (bl:blid) lbs = res
+    where blibset = S.fromList (bl:blid)
+          res = case ( L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
+                []     -> Nothing
+                (x:xs) -> Just x
 
 tryOpenBestLibrary :: [Book] -> M.IntMap Library -> Maybe Library -> M.IntMap LibraryOpened
                         -> (Maybe Library, M.IntMap Library, M.IntMap LibraryOpened)
