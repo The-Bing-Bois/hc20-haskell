@@ -126,14 +126,14 @@ tryGetBestLibrary (bl:blid) lbs = res
 
 tryOpenBestLibrary :: [Book] -> M.IntMap Library -> Maybe Library -> M.IntMap LibraryOpened
                         -> (Maybe Library, M.IntMap Library, M.IntMap LibraryOpened)
-tryOpenBestLibrary []                               lbs _       s = (Nothing, lbs, s)
+tryOpenBestLibrary []                               lbs Nothing       s = (Nothing, lbs, s)
 tryOpenBestLibrary ((Book bid score []):bs)         lbs Nothing s = tryOpenBestLibrary bs lbs Nothing s
-tryOpenBestLibrary ((Book bid score (lid:blid)):bs) lbs Nothing s = case (tryGetBestLibrary (lid:blid) lbs) of
+tryOpenBestLibrary ((Book bid score (blid:blist)):bs) lbs Nothing s = case (tryGetBestLibrary (blid:blist) lbs) of
     Nothing -> tryOpenBestLibrary bs lbs Nothing s 
     Just (Library lid t m n) -> (Just (Library lid t m (M.size s)), (M.delete lid lbs), s)
-tryOpenBestLibrary (b:bs) lbs (Just (Library lid t m n)) s
+tryOpenBestLibrary bs lbs (Just (Library lid t m n)) s
     | t > 1 = (Just (Library lid (t-1) m n), lbs, s)
     | otherwise = (x, y, M.insert lid (LibraryOpened lid [] m [] n) (M.union z s))
-                  where (x, y, z) = tryOpenBestLibrary (b:bs) (M.delete lid lbs) Nothing s
+                  where (x, y, z) = tryOpenBestLibrary bs (M.delete lid lbs) Nothing s
 
 
