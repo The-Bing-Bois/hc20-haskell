@@ -1,7 +1,10 @@
 module Main where
 
 import Lib
+import System.Environment
 
 main :: IO ()
-main = ((writeAnswer . solve . readData) <$> readFile "in.txt") >>= writeFile "out.txt"
+main = getArgs >>= parse
 
+parse (fin:fout:[]) = ((writeAnswer . solve . readData) <$> readFile fin) >>= writeFile fout
+parse _ = print "Usage: hc20 in.txt out.txt"

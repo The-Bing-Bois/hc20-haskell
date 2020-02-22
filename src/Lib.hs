@@ -46,7 +46,7 @@ readData input = (newBm, newLib, (read d))
 -- takes an array of LibraryOpened and create an output
 writeAnswer :: [LibraryOpened] -> String
 writeAnswer lst = (show $ length lst) ++ "\n" ++ (writeLibrary sortedList "")
-    where sortedList = L.sort lst
+    where sortedList = reverse . L.sort $ lst
           writeLibrary [] out = out
           writeLibrary ((LibraryOpened id bs _ _ _):lbs) out =
                 writeLibrary lbs (out ++ (show id) ++ " "
@@ -54,7 +54,7 @@ writeAnswer lst = (show $ length lst) ++ "\n" ++ (writeLibrary sortedList "")
 
 -- map the Scores into the Book map
 mapScores :: [Int] -> Int -> M.IntMap Book -> M.IntMap Book
-mapScores [] _ z = z
+mapScores []     _ z = z
 mapScores (b:bs) n z = mapScores bs (n+1) (M.insert n (Book n b []) z)
 
 -- map the Library into the Library map and add an index reference to any Book it contains
@@ -63,7 +63,7 @@ mapLibrary [] bm z = (bm, z)
 mapLibrary (i:b:ls) bm z = mapLibrary ls newBm newZ
     where [_, bookPerDay, signUpTime] = read <$> words i
           lid = M.size z
-          newZ = M.insert lid (Library lid signUpTime bookPerDay 0) z
+          newZ = M.insert lid (Library lid signUpTime bookPerDay (-1)) z
           newBm = updateFromLibrary (read <$> words b) bm lid
           updateBook lid (Just (Book bid score blibs)) = Just (Book bid score (blibs ++ [lid]))
           updateBook _ Nothing = Nothing
@@ -71,11 +71,12 @@ mapLibrary (i:b:ls) bm z = mapLibrary ls newBm newZ
 
 -- solve the problem given the tuple and sort by opened library, requires books sorted by score
 solve :: ([Book], M.IntMap Library, Days) -> [LibraryOpened]
-solve (b, lbs, d) = L.sort $ M.elems o
+solve (b, lbs, d) = filter (\(LibraryOpened _ l _ _ _) -> (length l) > 0) . L.sort . M.elems $ o
     where (_, _, _, _, o) = solveFull b lbs d Nothing M.empty
 
 -- solve the given problem exiting on Day or Book finished
-solveFull :: [Book] -> M.IntMap Library -> Days -> Maybe Library -> M.IntMap LibraryOpened -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
+solveFull :: [Book] -> M.IntMap Library -> Days -> Maybe Library -> M.IntMap LibraryOpened
+              -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
 solveFull [] _ _ _ opened = ([], M.empty, -1, Nothing, opened)
 solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened)
 solveFull bs libs d opening opened = solveFull newBs newLib newD newOpening newOpened
@@ -114,9 +115,15 @@ tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened)
 pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
     where (newOpening, newLibs, newOpened) = tryOpenBestLibrary bs libs opening opened
 
+-- tryGetBestLibrary []          _ = Nothing
+-- tryGetBestLibrary (bl:blid) lbs = 
+   -- case ( L.sort $ filter (\(Library lid _ _ _) -> any (\(xid) -> lid == xid) (bl:blid)) $ M.elems lbs ) of
+        -- []     -> Nothing
+        -- (x:xs) -> Just x
+
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = 
-   case ( filter (\(Library lid _ _ _) -> any (\(xid) -> lid == xid) (bl:blid)) $ L.sort $ M.elems lbs ) of
+   case ( L.sort $ filter (\(Library lid _ _ _) -> any (\(xid) -> lid == xid) (bl:blid)) $ M.elems lbs ) of
         []     -> Nothing
         (x:xs) -> Just x
 
@@ -128,9 +135,8 @@ tryOpenBestLibrary ((Book bid score (lid:blid)):bs) lbs Nothing s = case (tryGet
     Nothing -> tryOpenBestLibrary bs lbs Nothing s 
     Just (Library lid t m n) -> (Just (Library lid t m (M.size s)), (M.delete lid lbs), s)
 tryOpenBestLibrary (b:bs) lbs (Just (Library lid t m n)) s
-    | t > 0 = (Just (Library lid (t-1) m n), lbs, s)
-    | otherwise = res
-                    where (x, y, z) = tryOpenBestLibrary (b:bs) (M.delete lid lbs) Nothing M.empty
-                          res = (x, y, M.insert lid (LibraryOpened lid [] m [] n) s)
+    | t > 1 = (Just (Library lid (t-1) m n), lbs, s)
+    | otherwise = (x, y, M.insert lid (LibraryOpened lid [] m [] n) (M.union z s))
+                  where (x, y, z) = tryOpenBestLibrary (b:bs) (M.delete lid lbs) Nothing s
 
 
