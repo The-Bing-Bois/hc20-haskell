@@ -68,6 +68,7 @@ mapLibrary (i:b:ls) bm z = mapLibrary ls newBm newZ
           updateBook lid (Just (Book bid score blibs)) = Just (Book bid score (blibs ++ [lid]))
           updateBook _ Nothing = Nothing
           updateFromLibrary xs bmap lid = foldr (M.alter (updateBook lid)) bmap xs
+mapLibrary [x] bm z = (bm, z)
 
 -- solve the problem given the tuple and sort by opened library, requires books sorted by score
 solve :: ([Book], M.IntMap Library, Days) -> [LibraryOpened]
