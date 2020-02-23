@@ -46,9 +46,8 @@ readData input = (newBm, newLib, (read d))
 
 -- takes an array of LibraryOpened and create an output
 writeAnswer :: [LibraryOpened] -> String
-writeAnswer lst = (show $ length lst) ++ "\n" ++ (writeLibrary sortedList "")
-    where sortedList = L.sort lst
-          writeLibrary [] out = out
+writeAnswer lst = (show $ length lst) ++ "\n" ++ (writeLibrary lst "")
+    where writeLibrary [] out = out
           writeLibrary ((LibraryOpened id bs _ _ _):lbs) out =
                 writeLibrary lbs (out ++ (show id) ++ " "
                     ++ (show $ length bs) ++ "\n" ++ (unwords $ show <$> bs) ++ "\n")
@@ -65,16 +64,17 @@ mapLibrary (i:b:ls) bm z = mapLibrary ls newBm newZ
     where [_, signUpTime, bookPerDay] = read <$> words i
           lid = M.size z
           newZ = M.insert lid (Library lid signUpTime bookPerDay (-1)) z
-          newBm = updateFromLibrary (read <$> words b) bm lid
           updateBook lid (Just (Book bid score blibs)) = Just (Book bid score (blibs ++ [lid]))
           updateBook _ Nothing = Nothing
           updateFromLibrary xs bmap lid = foldr (M.alter (updateBook lid)) bmap xs
+          newBm = updateFromLibrary (read <$> words b) bm lid
 mapLibrary [x] bm z = (bm, z)
 
 -- solve the problem given the tuple and sort by opened library, requires books sorted by score
 solve :: ([Book], M.IntMap Library, Days) -> [LibraryOpened]
-solve (b, lbs, d) = L.sort . filter (\(LibraryOpened _ l _ _ _) -> (length l) > 0) . M.elems $ o
-    where (_, _, _, _, o) = solveFull b lbs (d+1) Nothing M.empty
+solve (b, lbs, d) = L.sort . M.elems $ o
+    where bs = filter (\(Book _ _ l) -> (length l) > 0) b
+          (_, _, _, _, o) = solveFull bs lbs (d+1) Nothing M.empty
 
 -- solve the given problem exiting on Day or Book finished
 solveFull :: [Book] -> M.IntMap Library -> Days -> Maybe Library -> M.IntMap LibraryOpened
@@ -102,7 +102,7 @@ tryFindLibrary (lid:blid) opened    = case (filter (flip M.member $ opened) (lid
                                         []      -> Nothing
                                         (x: _)  -> M.lookup x opened
 
-tryStuffingBooks [] opened filled                         = ([], (M.union opened filled))
+tryStuffingBooks []                         opened filled = ([], (M.union opened filled))
 tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened) of
     0 -> ((Book bid score blid):bs, filled)
     _ ->  case (tryFindLibrary blid opened) of
@@ -110,7 +110,7 @@ tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened)
                 where (rbs, rf) = tryStuffingBooks bs opened filled
             Just (LibraryOpened lid blst max clst n) -> x
                 where x
-                       | (length clst) == max - 1 = tryStuffingBooks bs (M.delete lid opened) (M.insert lid (LibraryOpened lid blst max (bid:clst) n) filled)
+                       | (length clst) == max - 1 = tryStuffingBooks bs (M.delete lid opened) (M.insert lid (LibraryOpened lid blst max (clst ++ [bid]) n) filled)
                        | (length clst) <  max - 1 = tryStuffingBooks bs (M.alter (appendBookToLibrary bid) lid opened) filled
 
 -- try to open a new library if possible
@@ -127,12 +127,14 @@ tryGetBestLibrary (bl:blid) lbs = res
 tryOpenBestLibrary :: [Book] -> M.IntMap Library -> Maybe Library -> M.IntMap LibraryOpened
                         -> (Maybe Library, M.IntMap Library, M.IntMap LibraryOpened)
 tryOpenBestLibrary []                                 lbs Nothing s = (Nothing, lbs, s)
-tryOpenBestLibrary ((Book bid score []):bs)           lbs Nothing s = tryOpenBestLibrary bs lbs Nothing s
 tryOpenBestLibrary ((Book bid score (blid:blist)):bs) lbs Nothing s = case (M.size lbs) of
     0 -> (Nothing, lbs, s)
     _ -> case (tryGetBestLibrary (blid:blist) lbs) of
             Nothing -> tryOpenBestLibrary bs lbs Nothing s
-            Just (Library lid t m _) -> (Just (Library lid (t-1) m (M.size s)), (M.delete lid lbs), s)
+            Just (Library lid t m _) -> x
+                 where x
+                        | t > 1     = (Just (Library lid (t-1) m (M.size s)), (M.delete lid lbs), s)
+                        | otherwise = tryOpenBestLibrary bs (M.delete lid lbs) Nothing (M.insert lid (LibraryOpened lid [] m [] (M.size s)) s)
 tryOpenBestLibrary bs lbs (Just (Library lid t m n)) s
     | t > 1     = (Just (Library lid (t-1) m n), lbs, s)
     | otherwise = tryOpenBestLibrary bs lbs Nothing (M.insert lid (LibraryOpened lid [] m [] n) s)
