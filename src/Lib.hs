@@ -79,9 +79,9 @@ solve (b, lbs, d) = filter (\(LibraryOpened _ l _ _ _) -> (length l) > 0) . L.so
 -- solve the given problem exiting on Day or Book finished
 solveFull :: [Book] -> M.IntMap Library -> Days -> Maybe Library -> M.IntMap LibraryOpened
               -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
-solveFull [] _ _ _ opened = ([], M.empty, -1, Nothing, opened)
-solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened)
-solveFull bs libs d opening opened = solveFull newBs newLib newD newOpening newOpened
+-- solveFull [] _ _ _ opened = ([], M.empty, -1, Nothing, opened)
+solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened) -------- looks like w/o this doesn't terminate
+solveFull (bs) libs d opening opened = solveFull newBs newLib newD newOpening newOpened
     where (newBs, newLib, newD, newOpening, newOpened) = tic . pass2 . pass1 $ (bs, libs, d, opening, opened)
 
 -- decrease the Day and reset currently scanned Books
@@ -92,30 +92,25 @@ tic (bs, libs, d, opening, opened) = (bs, libs, d-1, opening, M.map updateLibrar
 
 -- try putting more books as possible in the opened libraries
 pass1 (bs, libs, d, opening, opened) = (newBs, libs, d, opening, newOpened)
-    where (newBs, _, newOpened) = tryStuffingBooks bs opened M.empty
+    where (newBs, newOpened) = tryStuffingBooks bs opened M.empty
 
 appendBookToLibrary bid (Just(LibraryOpened id blst max clst n)) = Just (LibraryOpened id blst max (clst ++ [bid]) n)
 appendBookToLibrary bid Nothing                                  = Nothing
-
--- tryFindLibrary [] opened            = Nothing
--- tryFindLibrary (lid:blid) opened    = case (M.lookup lid opened) of
-    -- Just (LibraryOpened a b c d e) -> Just(LibraryOpened a b c d e)
-    -- Nothing                        -> tryFindLibrary blid opened
 
 tryFindLibrary [] opened            = Nothing
 tryFindLibrary (lid:blid) opened    = res
                                       where blibset = S.fromList (lid:blid)
                                             feels (LibraryOpened _ _ _ a _) (LibraryOpened _ _ _ b _) = compare (length a) (length b)
                                             res = case ( L.sortBy feels $ filter (\(LibraryOpened lid _ _ _ _) -> S.member lid blibset) $ M.elems opened ) of
-                                                            []                             -> Nothing
-                                                            (LibraryOpened a b c d e : _)  -> Just(LibraryOpened a b c d e)
+                                                            []      -> Nothing
+                                                            (x: _)  -> Just x
 
-tryStuffingBooks [] opened filled                         = ([], M.empty, (M.union opened filled))
+tryStuffingBooks [] opened filled                         = ([], (M.union opened filled))
 tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened) of
-    0 -> ((Book bid score blid):bs, M.empty, (M.union opened filled))
+    0 -> ((Book bid score blid):bs, filled)
     _ ->  case (tryFindLibrary blid opened) of
-            Nothing -> ((Book bid score blid):rbs, M.empty, (M.union ro rf))
-                where (rbs, ro, rf) = tryStuffingBooks bs opened filled
+            Nothing -> ((Book bid score blid):rbs, rf)
+                where (rbs, rf) = tryStuffingBooks bs opened filled
             Just (LibraryOpened lid blst max clst n) -> x
                 where x
                        | (length clst) == max - 1 = tryStuffingBooks bs (M.delete lid opened) (M.insert lid (LibraryOpened lid blst max (bid:clst) n) filled)
@@ -128,20 +123,21 @@ pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = res
     where blibset = S.fromList (bl:blid)
-          res = case (  reverse $ L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
-                []     -> Nothing
-                (x:xs) -> Just x
+          res = case ( reverse $ L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
+                []    -> Nothing
+                (x:_) -> Just x
 
 tryOpenBestLibrary :: [Book] -> M.IntMap Library -> Maybe Library -> M.IntMap LibraryOpened
                         -> (Maybe Library, M.IntMap Library, M.IntMap LibraryOpened)
-tryOpenBestLibrary []                               lbs Nothing       s = (Nothing, lbs, s)
-tryOpenBestLibrary ((Book bid score []):bs)         lbs Nothing s = tryOpenBestLibrary bs lbs Nothing s
-tryOpenBestLibrary ((Book bid score (blid:blist)):bs) lbs Nothing s = case (tryGetBestLibrary (blid:blist) lbs) of
-    Nothing -> tryOpenBestLibrary bs lbs Nothing s 
-    Just (Library lid t m n) -> (Just (Library lid t m (M.size s)), (M.delete lid lbs), s)
+tryOpenBestLibrary []                                 lbs Nothing s = (Nothing, lbs, s)
+tryOpenBestLibrary ((Book bid score []):bs)           lbs Nothing s = tryOpenBestLibrary bs lbs Nothing s
+tryOpenBestLibrary ((Book bid score (blid:blist)):bs) lbs Nothing s = case (M.size lbs) of
+    0 -> (Nothing, lbs, s)
+    _ -> case (tryGetBestLibrary (blid:blist) lbs) of
+            Nothing -> tryOpenBestLibrary bs lbs Nothing s
+            Just (Library lid t m _) -> (Just (Library lid t m (M.size s)), (M.delete lid lbs), s)
 tryOpenBestLibrary bs lbs (Just (Library lid t m n)) s
-    | t > 0 = (Just (Library lid (t-1) m n), lbs, s)
-    | otherwise = (x, y, M.insert lid (LibraryOpened lid [] m [] n) z)
-                  where (x, y, z) = tryOpenBestLibrary bs (M.delete lid lbs) Nothing s
+    | t > 1     = (Just (Library lid (t-1) m n), lbs, s)
+    | otherwise = tryOpenBestLibrary bs lbs Nothing (M.insert lid (LibraryOpened lid [] m [] n) s)
 
 
