@@ -68,7 +68,7 @@ mapLibrary (i:b:ls) bm z = mapLibrary ls newBm newZ
           updateBook _ Nothing = Nothing
           updateFromLibrary xs bmap lid = foldr (M.alter (updateBook lid)) bmap xs
           newBm = updateFromLibrary (read <$> words b) bm lid
-mapLibrary [x] bm z = (bm, z)
+mapLibrary [_] bm z = (bm, z)
 
 -- solve the problem given the tuple and sort by opened library, requires books sorted by score
 solve :: ([Book], M.IntMap Library, Days) -> [LibraryOpened]
@@ -91,17 +91,23 @@ tic (bs, libs, d, opening, opened) = (bs, libs, d-1, opening, M.map updateLibrar
     where updateLibrary (LibraryOpened id books max current n) = LibraryOpened id (books ++ current) max [] n
 
 -- try putting more books as possible in the opened libraries
+pass1 :: ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
+            -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
 pass1 (bs, libs, d, opening, opened) = (newBs, libs, d, opening, newOpened)
     where (newBs, newOpened) = tryStuffingBooks bs opened M.empty
 
+appendBookToLibrary :: Int -> Maybe LibraryOpened -> Maybe LibraryOpened
 appendBookToLibrary bid (Just(LibraryOpened id blst max clst n)) = Just (LibraryOpened id blst max (clst ++ [bid]) n)
-appendBookToLibrary bid Nothing                                  = Nothing
+appendBookToLibrary _   Nothing                                  = Nothing
 
-tryFindLibrary [] opened            = Nothing
+tryFindLibrary :: [Int] -> M.IntMap LibraryOpened -> Maybe LibraryOpened
+tryFindLibrary []         _         = Nothing
 tryFindLibrary (lid:blid) opened    = case (filter (flip M.member $ opened) (lid:blid)) of
                                         []      -> Nothing
                                         (x: _)  -> M.lookup x opened
 
+tryStuffingBooks :: [Book] -> M.IntMap LibraryOpened -> M.IntMap LibraryOpened
+                    -> ([Book], M.IntMap LibraryOpened)
 tryStuffingBooks []                         opened filled = ([], (M.union opened filled))
 tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened) of
     0 -> ((Book bid score blid):bs, filled)
@@ -112,11 +118,15 @@ tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened)
                 where x
                        | (length clst) == max - 1 = tryStuffingBooks bs (M.delete lid opened) (M.insert lid (LibraryOpened lid blst max (clst ++ [bid]) n) filled)
                        | (length clst) <  max - 1 = tryStuffingBooks bs (M.alter (appendBookToLibrary bid) lid opened) filled
+                       | otherwise                = tryStuffingBooks (Book bid score blid : bs) (M.delete lid opened) (M.insert lid (LibraryOpened lid blst max clst n) filled)
 
 -- try to open a new library if possible
+pass2 :: ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
+            -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
 pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
     where (newOpening, newLibs, newOpened) = tryOpenBestLibrary bs libs opening opened
 
+tryGetBestLibrary :: [Int] -> M.IntMap Library -> Maybe Library
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = res
     where blibset = S.fromList (bl:blid)
@@ -127,7 +137,8 @@ tryGetBestLibrary (bl:blid) lbs = res
 tryOpenBestLibrary :: [Book] -> M.IntMap Library -> Maybe Library -> M.IntMap LibraryOpened
                         -> (Maybe Library, M.IntMap Library, M.IntMap LibraryOpened)
 tryOpenBestLibrary []                                 lbs Nothing s = (Nothing, lbs, s)
-tryOpenBestLibrary ((Book bid score (blid:blist)):bs) lbs Nothing s = case (M.size lbs) of
+tryOpenBestLibrary ((Book _    _ []):bs)           lbs Nothing s = tryOpenBestLibrary bs lbs Nothing s
+tryOpenBestLibrary ((Book _ _ (blid:blist)):bs) lbs Nothing s = case (M.size lbs) of
     0 -> (Nothing, lbs, s)
     _ -> case (tryGetBestLibrary (blid:blist) lbs) of
             Nothing -> tryOpenBestLibrary bs lbs Nothing s
