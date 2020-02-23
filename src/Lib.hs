@@ -73,14 +73,14 @@ mapLibrary [x] bm z = (bm, z)
 
 -- solve the problem given the tuple and sort by opened library, requires books sorted by score
 solve :: ([Book], M.IntMap Library, Days) -> [LibraryOpened]
-solve (b, lbs, d) = filter (\(LibraryOpened _ l _ _ _) -> (length l) > 0) . L.sort . M.elems $ o
+solve (b, lbs, d) = L.sort . filter (\(LibraryOpened _ l _ _ _) -> (length l) > 0) . M.elems $ o
     where (_, _, _, _, o) = solveFull b lbs (d+1) Nothing M.empty
 
 -- solve the given problem exiting on Day or Book finished
 solveFull :: [Book] -> M.IntMap Library -> Days -> Maybe Library -> M.IntMap LibraryOpened
               -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
 solveFull [] _ _ _ opened = ([], M.empty, -1, Nothing, opened)
-solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened) -------- looks like w/o this doesn't terminate
+solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened)
 solveFull (b:bs) libs d opening opened = solveFull newBs newLib newD newOpening newOpened
     where (newBs, newLib, newD, newOpening, newOpened) = tic . pass2 . pass1 $ (b:bs, libs, d, opening, opened)
 
@@ -102,7 +102,6 @@ tryFindLibrary (lid:blid) opened    = case (filter (flip M.member $ opened) (lid
                                         []      -> Nothing
                                         (x: _)  -> M.lookup x opened
 
-
 tryStuffingBooks [] opened filled                         = ([], (M.union opened filled))
 tryStuffingBooks ((Book bid score blid):bs) opened filled = case (M.size opened) of
     0 -> ((Book bid score blid):bs, filled)
@@ -121,9 +120,9 @@ pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = res
     where blibset = S.fromList (bl:blid)
-          res = case ( L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
+          res = case ( filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
                 []    -> Nothing
-                (x:_) -> Just x
+                (x:xs) -> Just (L.minimum (x:xs))
 
 tryOpenBestLibrary :: [Book] -> M.IntMap Library -> Maybe Library -> M.IntMap LibraryOpened
                         -> (Maybe Library, M.IntMap Library, M.IntMap LibraryOpened)
