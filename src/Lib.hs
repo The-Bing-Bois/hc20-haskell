@@ -47,7 +47,7 @@ readData input = (newBm, newLib, (read d))
 -- takes an array of LibraryOpened and create an output
 writeAnswer :: [LibraryOpened] -> String
 writeAnswer lst = (show $ length lst) ++ "\n" ++ (writeLibrary sortedList "")
-    where sortedList = reverse $ L.sortBy (\(LibraryOpened _ a _ _ _) (LibraryOpened _ b _ _ _) -> compare (length a) (length b)) $ lst
+    where sortedList = L.sort lst
           writeLibrary [] out = out
           writeLibrary ((LibraryOpened id bs _ _ _):lbs) out =
                 writeLibrary lbs (out ++ (show id) ++ " "
@@ -79,10 +79,10 @@ solve (b, lbs, d) = filter (\(LibraryOpened _ l _ _ _) -> (length l) > 0) . L.so
 -- solve the given problem exiting on Day or Book finished
 solveFull :: [Book] -> M.IntMap Library -> Days -> Maybe Library -> M.IntMap LibraryOpened
               -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
--- solveFull [] _ _ _ opened = ([], M.empty, -1, Nothing, opened)
-solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened) -------- looks like w/o this doesn't terminate
-solveFull (bs) libs d opening opened = solveFull newBs newLib newD newOpening newOpened
-    where (newBs, newLib, newD, newOpening, newOpened) = tic . pass2 . pass1 $ (bs, libs, d, opening, opened)
+solveFull [] _ _ _ opened = ([], M.empty, -1, Nothing, opened)
+-- solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened) -------- looks like w/o this doesn't terminate
+solveFull (b:bs) libs d opening opened = solveFull newBs newLib newD newOpening newOpened
+    where (newBs, newLib, newD, newOpening, newOpened) = tic . pass2 . pass1 $ (b:bs, libs, d, opening, opened)
 
 -- decrease the Day and reset currently scanned Books
 tic :: ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
