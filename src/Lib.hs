@@ -62,7 +62,7 @@ mapScores (b:bs) n z = mapScores bs (n+1) (M.insert n (Book n b []) z)
 mapLibrary :: [String] -> M.IntMap Book -> M.IntMap Library -> (M.IntMap Book, M.IntMap Library)
 mapLibrary [] bm z = (bm, z)
 mapLibrary (i:b:ls) bm z = mapLibrary ls newBm newZ
-    where [_, bookPerDay, signUpTime] = read <$> words i
+    where [_, signUpTime, bookPerDay] = read <$> words i
           lid = M.size z
           newZ = M.insert lid (Library lid signUpTime bookPerDay (-1)) z
           newBm = updateFromLibrary (read <$> words b) bm lid
@@ -123,7 +123,7 @@ pass2 (bs, libs, d, opening, opened) = (bs, newLibs, d, newOpening, newOpened)
 tryGetBestLibrary []          _ = Nothing
 tryGetBestLibrary (bl:blid) lbs = res
     where blibset = S.fromList (bl:blid)
-          res = case ( reverse $ L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
+          res = case ( L.sort $ filter (\(Library lid _ _ _) -> S.member lid blibset) $ M.elems lbs ) of
                 []    -> Nothing
                 (x:_) -> Just x
 
