@@ -8,16 +8,18 @@ import qualified Data.IntMap.Strict as M
 import qualified Data.List as L
 import qualified Data.Set as S
 
+import Debug.Trace
+
 --- TYPES & DATA -------------------------------------------------
 
 -- type for typechecking
 type Days        = Int
 type MaxBooks    = Int
 type NoOpen      = Int
-type LibraryId   = Int       -- [1, 1000]
-type BookId      = Int       -- [1, 100000]
-type Score       = Int       -- [1, 800]
-type SignUpTime  = Int       -- [1, ?]
+type LibraryId   = Int
+type BookId      = Int
+type Score       = Int
+type SignUpTime  = Int
 
 -- type of Books, sortable by Score
 data Book = Book BookId Score [LibraryId] deriving (Show, Eq)
@@ -74,15 +76,18 @@ mapLibrary [_] bm z = (bm, z)
 solve :: ([Book], M.IntMap Library, Days) -> [LibraryOpened]
 solve (b, lbs, d) = L.sort . M.elems $ o
     where bs = filter (\(Book _ _ l) -> (length l) > 0) b
-          (_, _, _, _, o) = solveFull bs lbs (d+1) Nothing M.empty
+          (_, _, _, _, o) = solveFull (bs, lbs, (d+1), Nothing, M.empty)
 
 -- solve the given problem exiting on Day or Book finished
-solveFull :: [Book] -> M.IntMap Library -> Days -> Maybe Library -> M.IntMap LibraryOpened
+solveFull :: ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
               -> ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
-solveFull [] _ _ _ opened = ([], M.empty, -1, Nothing, opened)
-solveFull _  _ 0 _ opened = ([], M.empty, -1, Nothing, opened)
-solveFull (b:bs) libs d opening opened = solveFull newBs newLib newD newOpening newOpened
-    where (newBs, newLib, newD, newOpening, newOpened) = tic . pass2 . pass1 $ (b:bs, libs, d, opening, opened)
+-- solveFull ([], _, _, _, opened) = ([], M.empty, -1, Nothing, opened)
+solveFull (_, _, 0, _, opened) = ([], M.empty, -1, Nothing, opened)
+solveFull ((b:bs), libs, d, opening, opened) = solveFull . traceStack ("day ramaining: " ++ (show d)
+                                                                        ++ " books remaining: " ++ (show . length $ b:bs)
+                                                                        ++ " library: " ++ (show . M.size $ libs)
+                                                                        ++ " opened: " ++ (show . M.size $ opened))
+                                                         . tic . pass2 . pass1 $! (b:bs, libs, d, opening, opened)
 
 -- decrease the Day and reset currently scanned Books
 tic :: ([Book], M.IntMap Library, Days, Maybe Library, M.IntMap LibraryOpened)
