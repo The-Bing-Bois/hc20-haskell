@@ -91,15 +91,10 @@ solve (b, lbs, d) = filter (\(LibraryOpened _ a _ _ _) -> (length a) > 0) . L.so
 -- solve the given problem exiting on Day or Book finished
 -- solveFull ([], _, _, _, opened) = ([], M.empty, -1, Nothing, opened)
 solveFull :: LibraryInstance -> LibraryInstance
-solveFull !(LibraryInstance _ _ 0 _ opened) = LibraryInstance [] M.empty (-1) Nothing opened
-solveFull !tup@(LibraryInstance (b:bs) libs d opening opened) =
-    solveFull
-    . traceStack ("day ramaining: " <> (show d)
-                    <> " books remaining: " <> (show . length $ b:bs)
-                    <> " opening ID: " <> (show opening)
-                    <> " library: " <> (show . M.size $ libs)
-                    <> " opened: " <> (show . M.size $ opened))
-    . tic . pass2 . pass1 $! tup
+-- solveFull !(LibraryInstance _ _ 0 _ opened) = LibraryInstance [] M.empty (-1) Nothing opened
+solveFull !tup@(LibraryInstance _ _ d _ _)
+    | d == 0   = tup
+    | otherwise = solveFull $! tic . pass2 . pass1 $! tup
 
 -- decrease the Day and reset currently scanned Books
 tic :: LibraryInstance -> LibraryInstance
@@ -108,23 +103,23 @@ tic !(LibraryInstance bs libs d opening opened) = (LibraryInstance bs libs (d-1)
 
 -- try putting more books as possible in the opened libraries
 pass1 :: LibraryInstance -> LibraryInstance
-pass1 (LibraryInstance bs libs d opening opened) = (LibraryInstance newBs libs d opening newOpened)
+pass1 !(LibraryInstance bs libs d opening opened) = (LibraryInstance newBs libs d opening newOpened)
     where (newBs, newOpened) = tryStuffingBooks bs opened M.empty
 
 appendBookToLibrary :: Int -> Maybe LibraryOpened -> Maybe LibraryOpened
-appendBookToLibrary bid (Just(LibraryOpened id blst max clst n)) = Just (LibraryOpened id blst max (clst ++ [bid]) n)
-appendBookToLibrary _   Nothing                                  = Nothing
+appendBookToLibrary !bid !(Just(LibraryOpened id blst max clst n)) = Just (LibraryOpened id blst max (clst ++ [bid]) n)
+appendBookToLibrary _   Nothing                                    = Nothing
 
 tryFindLibrary :: [Int] -> M.IntMap LibraryOpened -> Maybe LibraryOpened
-tryFindLibrary []         _         = Nothing
-tryFindLibrary (lid:blid) opened    = case (filter (flip M.member $ opened) (lid:blid)) of
+tryFindLibrary ![]         _         = Nothing
+tryFindLibrary !(lid:blid) !opened    = case (filter (flip M.member $ opened) (lid:blid)) of
                                         []      -> Nothing
                                         (x:_)  -> M.lookup x opened
 
 tryStuffingBooks :: [Book] -> M.IntMap LibraryOpened -> M.IntMap LibraryOpened
                     -> ([Book], M.IntMap LibraryOpened)
-tryStuffingBooks []                           opened filled = ([], (M.union opened filled))
-tryStuffingBooks ((Book bid score blid) : bs) opened filled = case (M.null opened) of
+tryStuffingBooks ![]                           !opened !filled = ([], (M.union opened filled))
+tryStuffingBooks !(!(Book bid score blid) : bs) !opened !filled = case (M.null opened) of
     True  -> ((Book bid score blid) : bs, filled)
     False ->  case (tryFindLibrary blid opened) of
         Nothing -> ((Book bid score blid) : rbs, rf)
@@ -143,13 +138,13 @@ tryStuffingBooks ((Book bid score blid) : bs) opened filled = case (M.null opene
 
 -- try to open a new library if possible
 pass2 :: LibraryInstance -> LibraryInstance
-pass2 (LibraryInstance bs libs d opening opened) = (LibraryInstance bs newLibs d newOpening newOpened)
+pass2 !(LibraryInstance bs !libs d !opening !opened) = (LibraryInstance bs newLibs d newOpening newOpened)
     where (newOpening, newLibs, newOpened) = tryOpenBestLibrary bs libs opening opened
 
 tryOpenBestLibrary :: [Book] -> M.IntMap Library -> Maybe Library -> M.IntMap LibraryOpened
                         -> (Maybe Library, M.IntMap Library, M.IntMap LibraryOpened)
-tryOpenBestLibrary [] lbs Nothing s = (Nothing, lbs, s)
-tryOpenBestLibrary bs lbs Nothing s =
+tryOpenBestLibrary ![] !lbs Nothing !s = (Nothing, lbs, s)
+tryOpenBestLibrary !bs !lbs Nothing !s =
     case (M.null lbs) of
         True  -> (Nothing, lbs, s)
         False -> x
@@ -162,7 +157,7 @@ tryOpenBestLibrary bs lbs Nothing s =
                                                     (M.delete lid lbs)
                                                     Nothing
                                                     (M.insert lid (LibraryOpened lid [] m [] (M.size s)) s)
-tryOpenBestLibrary bs lbs (Just (Library lid t m n)) s
+tryOpenBestLibrary !bs !lbs !(Just (Library lid t m n)) !s
     | t > 1     = (Just (Library lid (t-1) m n)
                    , lbs
                    , s)
