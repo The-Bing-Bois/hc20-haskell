@@ -33,7 +33,7 @@ instance Show Book where
 
 mapScores :: [Int] -> Int -> M.IntMap Book -> M.IntMap Book
 mapScores []     _ z = z
-mapScores (b:bs) n z = mapScores bs (n+1) (M.insert n (Book n b) z)
+mapScores (b:bs) n z = mapScores bs (n + 1) (M.insert n (Book n b) z)
 
 bookId :: Book -> BookId
 bookId (Book id _) = id
@@ -91,7 +91,7 @@ writeAnswer lst = (show $ length lst) <> "\n" <> (writeLibrary lst "")
 -- solve the problem given an instance
 solve :: LibraryInstance -> [Library]
 solve (LibraryInstance lbs d) = filter (\(Library _ _ _ a) -> not . null $ a) solution
-    where solution = solveFull (LibraryInstance lbs d) []
+    where solution = solveFull (LibraryInstance lbs (d + 1)) []
 
 solveFull :: LibraryInstance -> [Library] -> [Library]
 solveFull (LibraryInstance [] days) solution = solution
@@ -107,7 +107,7 @@ solveFull !i@(LibraryInstance lbs days) !solution =
 
 chooseBestCandidate :: LibraryInstance -> Library
 chooseBestCandidate (LibraryInstance lbs days) = trimInDays days $ L.maximumBy (compareScore days) lbs
-    where compareScore days a b = compare (scoreLibrary a days) (scoreLibrary b days)
+    where compareScore days a@(Library _ ta _ _) b@(Library _ tb _ _) = compare ((scoreLibrary a days)*(tb)) ((scoreLibrary b days)*(ta))
 
 updateLibraryFromCandidate :: [Library] -> Library -> [Library]
 updateLibraryFromCandidate lbs (Library cid _ _ candidateBooks) = filterEmpty $ filterWithCandidate <$> filterCandidate lbs
