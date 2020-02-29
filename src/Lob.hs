@@ -12,7 +12,7 @@ import qualified Data.IntMap.Strict as M
 import qualified Data.List as L
 import qualified Data.Set as S
 
-import Debug.Trace
+import qualified Debug.Trace as D
 
 --- TYPES & DATA -----------------------------------------
 
@@ -43,18 +43,13 @@ data Library = Library LibraryId SignUpTime MaxBooks [Book] deriving (Show, Eq)
 instance Ord Library where
     compare (Library _ a _ _) (Library _ b _ _) = compare a b
 
-helperScoreLibrary :: [Book] -> Int -> Int -> Int
-helperScoreLibrary []              m c = c
-helperScoreLibrary _               0 c = c
-helperScoreLibrary ((Book _ s):bs) m c = helperScoreLibrary bs (m - 1) (c + s)
-
 scoreLibrary :: Library -> Days -> Int
-scoreLibrary (Library _ up booksPerDay bs) days =
-    helperScoreLibrary bs ((days - up) * booksPerDay) 0
+scoreLibrary (Library _ up booksPerDay bs) days = L.foldl' sumBooks 0 (take (booksPerDay * (days - up)) bs) 
+    where sumBooks t (Book _ s) = t + s
 
 trimInDays :: Days -> Library -> Library
-trimInDays days (Library a b booksPerDay bs) = 
-    (Library a b booksPerDay (take (booksPerDay * days) bs))
+trimInDays days (Library a up booksPerDay bs) = 
+    (Library a up booksPerDay (take (booksPerDay * (days - up)) bs))
 
 mapLibrary :: [String] -> M.IntMap Book -> M.IntMap Library -> M.IntMap Library
 mapLibrary []  _ z = z
@@ -81,7 +76,7 @@ readData input = LibraryInstance lbs d
     where (l:bs:ls) = lines input
           [_, _, d] = read <$> words l
           books     = mapScores (read <$> words bs) 0 M.empty
-          lbs       = M.elems $ mapLibrary ls books M.empty
+          lbs       = L.sort . M.elems $ mapLibrary ls books M.empty
 
 -- takes an array of Library and create an output
 writeAnswer :: [Library] -> String
@@ -96,13 +91,16 @@ writeAnswer lst = (show $ length lst) <> "\n" <> (writeLibrary lst "")
 -- solve the problem given an instance
 solve :: LibraryInstance -> [Library]
 solve (LibraryInstance lbs d) = filter (\(Library _ _ _ a) -> not . null $ a) solution
-    where solution = solveFull (LibraryInstance lbs (d+1)) []
+    where solution = solveFull (LibraryInstance lbs d) []
 
 solveFull :: LibraryInstance -> [Library] -> [Library]
 solveFull (LibraryInstance [] days) solution = solution
 solveFull (LibraryInstance _  0) solution = solution
-solveFull i@(LibraryInstance lbs days) solution =
-    solveFull (LibraryInstance newLibrary newDays) (solution ++ [newCandidate])
+solveFull !i@(LibraryInstance lbs days) !solution =
+    solveFull (D.trace ("added: " <> (show $ scoreLibrary newCandidate days) 
+                        <> " days remaining: " <> (show $ newDays) 
+                        <> " libraries: " <> (show $ length lbs))
+              (LibraryInstance newLibrary newDays)) (solution ++ [newCandidate])
         where newCandidate = chooseBestCandidate i
               newLibrary   = updateLibraryFromCandidate lbs   newCandidate
               newDays      = updateDaysFromCandidate    days  newCandidate
@@ -112,11 +110,14 @@ chooseBestCandidate (LibraryInstance lbs days) = trimInDays days $ L.maximumBy (
     where compareScore days a b = compare (scoreLibrary a days) (scoreLibrary b days)
 
 updateLibraryFromCandidate :: [Library] -> Library -> [Library]
-updateLibraryFromCandidate lbs (Library cid _ _ candidateBooks) = filterWithCandidate <$> filterCandidate lbs
+updateLibraryFromCandidate lbs (Library cid _ _ candidateBooks) = filterEmpty $ filterWithCandidate <$> filterCandidate lbs
         where bookSet = S.fromList $ bookId <$> candidateBooks
               filterWithCandidate (Library a b c books) =
                     (Library a b c (filter (\(Book id _) -> not (S.member id bookSet)) books))
               filterCandidate libs = filter (\(Library id _ _ _) -> not (id == cid)) libs
+              filterEmpty libs = filter (\(Library _ _ _ a) -> (length a) > 0) libs
 
-updateDaysFromCandidate days (Library _ t _ _) = (days - t)
+updateDaysFromCandidate days (Library _ t _ _)
+    | (days - t) > 0 = (days - t)
+    | otherwise      = 0
 
